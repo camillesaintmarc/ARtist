@@ -636,6 +636,7 @@ GameObject:
   - component: {fileID: 1974837161}
   - component: {fileID: 1974837162}
   - component: {fileID: 1974837163}
+  - component: {fileID: 1974837164}
   m_Layer: 0
   m_Name: XR Origin
   m_TagString: Untagged
@@ -722,7 +723,25 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   arRaycastManager: {fileID: 1974837162}
-  objectToPlacePrefab: {fileID: 2190961431618534812, guid: e0a342e49714ed44487476a1554bbf52, type: 3}
+  objectToPlacePrefab: {fileID: 2247851851297657306, guid: 0bfe1f5a64e67fe40a0eba6b5a06be94, type: 3}
+--- !u!114 &1974837164
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1974837158}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c47b7f6846156344ebf4a1f1738bd1e6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  arCamera: {fileID: 161933083}
+  linePrefab: {fileID: 4382989178140717376, guid: 69c1afd708093fd49beaf298c2c16425, type: 3}
+  arPlaneManager: {fileID: 1974837161}
+  minDistanceBetweenPoints: 0.01
+  lineOffset: 0.01
+  trackableTypes: 1
 --- !u!1 &2074959259
 GameObject:
   m_ObjectHideFlags: 0

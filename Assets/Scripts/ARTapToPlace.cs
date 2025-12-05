@@ -4,7 +4,6 @@ using UnityEngine.InputSystem;
 using System.Collections.Generic;
 using UnityEngine.InputSystem.EnhancedTouch;
 
-
 public class ARTapToPlace : MonoBehaviour
 {
     // Références à assigner dans l'Inspector
@@ -20,32 +19,29 @@ public class ARTapToPlace : MonoBehaviour
     private InputAction touchPositionAction;
     private InputAction touchPressAction; 
 
-    // Variable pour suivre la position du toucher (si nécessaire)
+    // Variable pour suivre la position du toucher
     private Vector2 touchPosition; 
 
-    // Assurez-vous d'utiliser l'EnhancedTouchSupport
     private void OnEnable()
     {
-        // Active le support des touchers avancés (nécessaire avec le New Input System pour AR)
+        // Active le support des touchers avancés
         EnhancedTouchSupport.Enable(); 
         
-        // Configuration simple avec Input System (vous pouvez utiliser un Asset d'Action)
-        // Exemple basique utilisant l'API Touchscreen
+        // Configuration des inputs
         touchPressAction = new InputAction("TouchPress", binding: "<Touchscreen>/primaryTouch/press");
         touchPositionAction = new InputAction("TouchPosition", binding: "<Touchscreen>/primaryTouch/position");
 
         touchPressAction.Enable();
         touchPositionAction.Enable();
 
-        // Écoutez l'événement de pression (quand le doigt touche l'écran)
+        // Abonnements aux événements
         touchPressAction.performed += OnTouchPressed;
-        // Mettez à jour la position de contact 
         touchPositionAction.performed += ctx => touchPosition = ctx.ReadValue<Vector2>();
     }
 
     private void OnDisable()
     {
-        // Désactivez les actions et le support
+        // Désabonnement et nettoyage
         touchPressAction.performed -= OnTouchPressed;
         touchPressAction.Disable();
         touchPositionAction.Disable();
@@ -55,16 +51,20 @@ public class ARTapToPlace : MonoBehaviour
 
     private void OnTouchPressed(InputAction.CallbackContext context)
     {
-        // La position du toucher est stockée dans la variable 'touchPosition'
+        // Raycast depuis la position du toucher vers les plans détectés
         if (arRaycastManager.Raycast(touchPosition, hits, UnityEngine.XR.ARSubsystems.TrackableType.PlaneWithinPolygon))
         {
-            // Le raycast a réussi et a touché un 'Trackable' (ici un plan détecté)
-
-            // 'hits[0]' contient l'information du point le plus proche
+            // Récupère la pose (position + rotation) du plan touché
             var hitPose = hits[0].pose;
 
-            // Instancier le cube au point de contact
-            Instantiate(objectToPlacePrefab, hitPose.position, hitPose.rotation);
+            // --- CORRECTION ---
+            // Le Quad d'Unity est vertical par défaut. 
+            // hitPose.rotation aligne l'objet avec la normale du plan (vers le haut).
+            // On ajoute une rotation de 90 degrés sur l'axe X pour le coucher à plat.
+            Quaternion rotationFinale = hitPose.rotation * Quaternion.Euler(90, 0, 0);
+
+            // Instancier le prefab avec la nouvelle rotation calculée
+            Instantiate(objectToPlacePrefab, hitPose.position, rotationFinale);
         }
     }
 }
