@@ -23,6 +23,13 @@ public class ARTapToPlace : MonoBehaviour
     [SerializeField]
     private bool m_SpawnAsChildren = false;
 
+    [Header("Bibliothèque de Graffitis")]
+    // REMPLACEZ 'private GameObject objectToPlacePrefab;' PAR CECI :
+    [SerializeField]
+    private List<GameObject> graffitiPrefabs = new List<GameObject>(); // Une liste !
+
+    private int currentPrefabIndex = 0; // Lequel est sélectionné (0 par défaut)
+
     // Liste pour stocker les résultats du raycast
     private List<ARRaycastHit> hits = new List<ARRaycastHit>();
 
@@ -103,19 +110,36 @@ public class ARTapToPlace : MonoBehaviour
         }
 
         // 2. Instanciation
-        var newObject = Instantiate(objectToPlacePrefab);
+        // On vérifie que la liste n'est pas vide
+        if (graffitiPrefabs.Count == 0) return false;
 
-        if (m_SpawnAsChildren)
-            newObject.transform.parent = transform;
+        // On instancie l'objet correspondant à l'index choisi
+        var newObject = Instantiate(graffitiPrefabs[currentPrefabIndex]);
 
-        // 3. Positionnement avec léger décalage (offset) pour éviter le Z-Fighting
+        // ... (Le reste : parent, position, rotation reste pareil) ...
+        if (m_SpawnAsChildren) newObject.transform.parent = transform;
         newObject.transform.position = spawnPoint + spawnNormal * 0.02f;
-
-        // 4. Rotation 
-        // Note : Cette logique oriente l'axe Z de l'objet VERS la surface (opposé à la normale)
-        // et tente de garder l'axe Y vers le haut du monde (Vector3.up).
         newObject.transform.rotation = Quaternion.LookRotation(spawnNormal * -1, Vector3.up);
 
         return true;
     }
+
+
+    // Elle sera appelée par vos boutons d'interface (Graffiti 1, Graffiti 2, etc.)
+    public void SetSelectedGraffiti(int index)
+    {
+        if (index >= 0 && index < graffitiPrefabs.Count)
+        {
+            currentPrefabIndex = index;
+            Debug.Log("Graffiti sélectionné : " + index);
+        }
+        else
+        {
+            Debug.LogError("Index invalide ! Vérifiez le nombre de prefabs dans la liste.");
+        }
+    }
+
+
+
+
 }
