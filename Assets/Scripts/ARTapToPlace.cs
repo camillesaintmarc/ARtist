@@ -4,7 +4,7 @@ using UnityEngine.InputSystem;
 using System.Collections.Generic;
 using UnityEngine.InputSystem.EnhancedTouch;
 using UnityEngine.EventSystems;
-using UnityEngine.UI; // Nécessaire pour gérer l'Image UI
+using UnityEngine.UI;
 
 public class ARTapToPlace : MonoBehaviour
 {
@@ -13,33 +13,30 @@ public class ARTapToPlace : MonoBehaviour
     [SerializeField] private Camera arCamera;
 
     [Header("Interface (UI)")]
-    [SerializeField] private Image previewUI; // Glissez votre "PreviewImage" ici
-    [SerializeField] private List<Sprite> graffitiSprites; // Liste des images (Mona Lisa, etc.)
+    [SerializeField] private Image previewUI; 
+    [SerializeField] private List<Sprite> graffitiSprites; 
 
     [Header("Bibliothèque de Graffitis")]
-    [SerializeField] private List<GameObject> graffitiPrefabs; // Liste des objets 3D
+    [SerializeField] private List<GameObject> graffitiPrefabs; 
+    
+    // NOUVEAU : Le filtre pour savoir quels objets on peut attraper
+    [Header("Interaction")]
+    [SerializeField] private LayerMask graffitiLayer; 
 
     // Variables internes
-    private GameObject currentObjectBeingDragged; // L'objet qu'on est en train de déplacer
+    private GameObject currentObjectBeingDragged; 
     private int currentPrefabIndex = 0;
     private List<ARRaycastHit> hits = new List<ARRaycastHit>();
     private bool isDragging = false;
+    private bool isNewObject = false; // Pour savoir si on vient de le créer ou si on le déplace
 
     private void Awake()
     {
         if (arCamera == null) arCamera = Camera.main;
-        
-        // Au démarrage, on initialise l'image (si on a des sprites)
-        if (graffitiSprites.Count > 0 && previewUI != null)
-        {
-            UpdatePreviewImage();
-        }
     }
 
-    // On utilise Update pour gérer le glisser-déposer fluide
     private void Update()
     {
-        // 1. Vérification de base (Y a-t-il un doigt sur l'écran ?)
         if (Touchscreen.current == null) return;
         var touch = Touchscreen.current.primaryTouch;
 
@@ -47,18 +44,26 @@ public class ARTapToPlace : MonoBehaviour
         {
             Vector2 touchPos = touch.position.ReadValue();
 
-            // CAS A : LE DÉBUT DU CLIC (On vient de poser le doigt)
+            // CAS A : DÉBUT DU CLIC
             if (touch.press.wasPressedThisFrame)
             {
-                // On vérifie SI on touche précisément l'image de prévisualisation
+                // 1. Est-ce qu'on touche l'UI (le bouton d'aperçu) ? -> CRÉATION
                 if (IsTouchingPreviewImage(touchPos))
                 {
                     isDragging = true;
-                    SpawnObjectAt(touchPos); // On crée l'objet tout de suite
+                    isNewObject = true;
+                    SpawnObjectAt(touchPos);
+                }
+                // 2. Sinon, est-ce qu'on touche un graffiti existant ? -> DÉPLACEMENT
+                else if (TryPickUpObject(touchPos))
+                {
+                    isDragging = true;
+                    isNewObject = false;
+                    // On ne fait rien d'autre, 'currentObjectBeingDragged' est rempli par TryPickUpObject
                 }
             }
 
-            // CAS B : ON EST EN TRAIN DE GLISSER (Le doigt bouge)
+            // CAS B : PENDANT LE GLISSEMENT
             if (isDragging && currentObjectBeingDragged != null)
             {
                 MoveObjectTo(touchPos);
@@ -66,53 +71,79 @@ public class ARTapToPlace : MonoBehaviour
         }
         else
         {
-            // CAS C : ON RELACHE LE DOIGT
+            // CAS C : RELÂCHEMENT
             if (isDragging)
             {
-                // On arrête le drag. L'objet reste là où il est.
                 isDragging = false;
+                
+                // Nettoyage seulement si c'était un NOUVEL objet qu'on a lâché dans le vide
+                if (isNewObject && currentObjectBeingDragged != null && !currentObjectBeingDragged.activeSelf)
+                {
+                    Destroy(currentObjectBeingDragged);
+                }
+                
                 currentObjectBeingDragged = null;
             }
         }
     }
 
-    // --- FONCTIONS DE LOGIQUE ---
+    // --- LOGIQUE ---
+
+    private bool TryPickUpObject(Vector2 screenPos)
+    {
+        // On lance un rayon physique (comme un laser) depuis la caméra
+        Ray ray = arCamera.ScreenPointToRay(screenPos);
+        
+        // On vérifie si ce rayon touche un objet qui a le bon Layer (Graffiti)
+        if (Physics.Raycast(ray, out RaycastHit hit, 100f, graffitiLayer))
+        {
+            // On a touché quelque chose ! On le prend en main.
+            currentObjectBeingDragged = hit.collider.gameObject;
+            return true;
+        }
+
+        return false;
+    }
 
     private void SpawnObjectAt(Vector2 screenPos)
     {
         if (graffitiPrefabs.Count == 0 || currentPrefabIndex >= graffitiPrefabs.Count) return;
 
-        // On instancie l'objet
         currentObjectBeingDragged = Instantiate(graffitiPrefabs[currentPrefabIndex]);
         
-        // On le place initialement (il risque d'être à zéro, mais sera corrigé dès la 1ère frame de mouvement)
+        // Important : On assigne le Layer au nouvel objet pour qu'on puisse le retoucher plus tard !
+        // (Au cas où vous auriez oublié de le mettre sur le prefab)
+        SetLayerRecursively(currentObjectBeingDragged, GetLayerFromMask(graffitiLayer));
+
+        currentObjectBeingDragged.SetActive(false); 
         MoveObjectTo(screenPos);
     }
 
     private void MoveObjectTo(Vector2 screenPos)
     {
-        // On lance le Raycast AR pour trouver le mur derrière le doigt
         if (arRaycastManager.Raycast(screenPos, hits, UnityEngine.XR.ARSubsystems.TrackableType.PlaneWithinPolygon))
         {
             var hitPose = hits[0].pose;
             
-            // On met à jour la position de l'objet qu'on tient
-            currentObjectBeingDragged.transform.position = hitPose.position + hitPose.up * 0.01f; // Petit offset
+            currentObjectBeingDragged.transform.position = hitPose.position + hitPose.up * 0.01f;
             currentObjectBeingDragged.transform.rotation = Quaternion.LookRotation(-hitPose.up, Vector3.up);
             
-            // Optionnel : On s'assure qu'il est visible
-            currentObjectBeingDragged.SetActive(true);
+            if (!currentObjectBeingDragged.activeSelf) currentObjectBeingDragged.SetActive(true);
         }
         else
         {
-            // Si le doigt n'est pas sur un plan (ex: dans le ciel), on peut masquer l'objet temporairement
-            // currentObjectBeingDragged.SetActive(false);
+            // Si on sort du mur avec un NOUVEL objet, on le cache
+            if (isNewObject && currentObjectBeingDragged.activeSelf)
+            {
+                currentObjectBeingDragged.SetActive(false);
+            }
+            // Note : Si c'est un ANCIEN objet qu'on déplace, on le laisse visible à sa dernière position
+            // même si le doigt part dans le ciel, c'est plus naturel.
         }
     }
 
-    // --- FONCTIONS UI ---
+    // --- FONCTIONS UI & UTILITAIRES ---
 
-    // Appelé par vos boutons (Mona Lisa, etc.)
     public void SetSelectedGraffiti(int index)
     {
         if (index >= 0 && index < graffitiPrefabs.Count)
@@ -124,38 +155,39 @@ public class ARTapToPlace : MonoBehaviour
 
     private void UpdatePreviewImage()
     {
-        // Met à jour l'image en haut à droite
         if (previewUI != null && indexIsValid(currentPrefabIndex, graffitiSprites))
         {
             previewUI.sprite = graffitiSprites[currentPrefabIndex];
-            
-            // Si l'image était cachée, on l'affiche
             if (!previewUI.gameObject.activeSelf) previewUI.gameObject.SetActive(true);
         }
     }
 
-    // Vérifie si le doigt touche spécifiquement l'image de preview
     private bool IsTouchingPreviewImage(Vector2 pos)
     {
         if (previewUI == null) return false;
-
-        // On crée un pointeur virtuel pour tester l'UI
         PointerEventData eventData = new PointerEventData(EventSystem.current);
         eventData.position = pos;
         List<RaycastResult> results = new List<RaycastResult>();
         EventSystem.current.RaycastAll(eventData, results);
-
-        // On regarde si dans tout ce qu'on touche, il y a notre PreviewImage
-        foreach (var result in results)
-        {
-            if (result.gameObject == previewUI.gameObject) return true;
-        }
-
+        foreach (var result in results) { if (result.gameObject == previewUI.gameObject) return true; }
         return false;
     }
 
-    private bool indexIsValid<T>(int i, List<T> list)
+    private bool indexIsValid<T>(int i, List<T> list) => list != null && i >= 0 && i < list.Count;
+
+    // Petite astuce pour récupérer l'index du Layer depuis le LayerMask
+    private int GetLayerFromMask(LayerMask mask)
     {
-        return list != null && i >= 0 && i < list.Count;
+        int layerNumber = 0;
+        int layer = mask.value;
+        while(layer > 0) { layer >>= 1; layerNumber++; }
+        return layerNumber - 1;
+    }
+
+    private void SetLayerRecursively(GameObject obj, int newLayer)
+    {
+        if (newLayer < 0) return;
+        obj.layer = newLayer;
+        foreach (Transform child in obj.transform) SetLayerRecursively(child.gameObject, newLayer);
     }
 }

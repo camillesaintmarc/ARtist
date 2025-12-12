@@ -12,7 +12,8 @@ GameObject:
   - component: {fileID: 3915328333980874103}
   - component: {fileID: 175157441151743227}
   - component: {fileID: 4980598432294436411}
-  m_Layer: 0
+  - component: {fileID: 6237037813420533468}
+  m_Layer: 6
   m_Name: Graffiti4
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -109,3 +110,24 @@ MeshCollider:
   m_Convex: 0
   m_CookingOptions: 30
   m_Mesh: {fileID: 10210, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!65 &6237037813420533468
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4787799153641089002}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1, y: 1, z: 6.1232336e-17}
+  m_Center: {x: 0, y: 0, z: 0}

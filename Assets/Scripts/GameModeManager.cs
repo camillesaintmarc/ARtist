@@ -2,44 +2,54 @@ using UnityEngine;
 
 public class GameModeManager : MonoBehaviour
 {
+    [Header("Scripts à contrôler")]
     public ARTapToPlace tapToPlaceScript;
     public ARPainter painterScript;
 
-    [Header("Interface")]
-    public GameObject graffitiSelectionPanel; // Le panneau contenant les choix de graffitis
+    [Header("Interface Graffiti")]
+    public GameObject graffitiSelectionPanel; // Le panneau avec les boutons Mona Lisa, etc.
+    public GameObject previewImageObject;     // L'image en haut à droite
 
+    [Header("Interface Peinture")]
+    public GameObject colorSelectionPanel;    // NOUVEAU : Le panneau avec les boutons de couleur
 
     private void Start()
     {
-        // Au démarrage, on s'assure que tout est éteint
-        Debug.Log("Démarrage : Aucun mode activé");
+        // Au démarrage, on cache TOUT pour avoir un écran propre
+        if (tapToPlaceScript != null) tapToPlaceScript.enabled = false;
+        if (painterScript != null) painterScript.enabled = false;
 
-        if (tapToPlaceScript != null) 
-            tapToPlaceScript.enabled = false;
-
-        if (painterScript != null) 
-            painterScript.enabled = false;
-
-        // On cache aussi le panneau de choix de graffitis s'il est assigné
-        if (graffitiSelectionPanel != null) 
-            graffitiSelectionPanel.SetActive(false);
+        // On cache tous les menus
+        if (graffitiSelectionPanel != null) graffitiSelectionPanel.SetActive(false);
+        if (previewImageObject != null) previewImageObject.SetActive(false);
+        if (colorSelectionPanel != null) colorSelectionPanel.SetActive(false);
     }
 
+    // Appelé par le bouton "Place Graffiti"
     public void ActivatePlacementMode()
     {
-        tapToPlaceScript.enabled = true;
-        painterScript.enabled = false;
+        // 1. Gérer les scripts
+        if(tapToPlaceScript != null) tapToPlaceScript.enabled = true;
+        if(painterScript != null) painterScript.enabled = false;
 
-        // On affiche le menu de choix
+        // 2. Gérer l'interface : On AFFICHE Graffiti, on CACHE Peinture
         if(graffitiSelectionPanel != null) graffitiSelectionPanel.SetActive(true);
+        if(previewImageObject != null) previewImageObject.SetActive(true);
+        
+        if(colorSelectionPanel != null) colorSelectionPanel.SetActive(false); // On cache les couleurs
     }
 
+    // Appelé par le bouton "AR Paint"
     public void ActivatePaintingMode()
     {
-        tapToPlaceScript.enabled = false;
-        painterScript.enabled = true;
+        // 1. Gérer les scripts
+        if(tapToPlaceScript != null) tapToPlaceScript.enabled = false;
+        if(painterScript != null) painterScript.enabled = true;
 
-        // On cache le menu de choix car on veut peindre
+        // 2. Gérer l'interface : On CACHE Graffiti, on AFFICHE Peinture
         if(graffitiSelectionPanel != null) graffitiSelectionPanel.SetActive(false);
+        if(previewImageObject != null) previewImageObject.SetActive(false);
+
+        if(colorSelectionPanel != null) colorSelectionPanel.SetActive(true); // On affiche les couleurs
     }
 }
