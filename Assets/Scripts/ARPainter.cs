@@ -3,6 +3,7 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.XR.ARFoundation;
 using UnityEngine.XR.ARSubsystems;
+using UnityEngine.EventSystems;
 
 [RequireComponent(typeof(ARRaycastManager))]
 public class ARPainter : MonoBehaviour
@@ -33,19 +34,25 @@ public class ARPainter : MonoBehaviour
 
     void Update()
     {
-        // Utilisation du New Input System : Touchscreen
-        if (Touchscreen.current == null)
-            return; // pas de touchscreen détecté
+        // Vérification de base
+        if (Touchscreen.current == null) return;
 
         var touch = Touchscreen.current.primaryTouch;
-        if (touch.press.isPressed) // le doigt est posé
+
+        // Si le doigt appuie sur l'écran
+        if (touch.press.isPressed)
         {
+            // --- PROTECTION UI ---
+            // Si le doigt est sur un bouton, on arrête tout ici (on ne dessine pas)
+            if (IsPointerOverUI(touch)) return; 
+
+            // Sinon, on dessine
             Vector2 screenPos = touch.position.ReadValue();
             HandleTouchHold(screenPos);
         }
         else
         {
-            // si on relâche et on a une ligne active -> finir la ligne
+            // Si on relâche le doigt et qu'une ligne est en cours, on la termine
             if (currentLine != null)
             {
                 FinishLine();
@@ -136,4 +143,13 @@ public class ARPainter : MonoBehaviour
             Destroy(lr.gameObject);
         }
     }
+
+    // Petite fonction utilitaire à ajouter dans ARPainter
+    private bool IsPointerOverUI(UnityEngine.InputSystem.Controls.TouchControl touch)
+    {
+        int touchId = touch.touchId.ReadValue();
+        return UnityEngine.EventSystems.EventSystem.current.IsPointerOverGameObject(touchId);
+    }
+
+
 }

@@ -3,68 +3,119 @@ using UnityEngine.XR.ARFoundation;
 using UnityEngine.InputSystem;
 using System.Collections.Generic;
 using UnityEngine.InputSystem.EnhancedTouch;
+using UnityEngine.EventSystems;
 
 public class ARTapToPlace : MonoBehaviour
 {
-    // Références à assigner dans l'Inspector
+    [Header("AR Setup")]
     [SerializeField]
     private ARRaycastManager arRaycastManager;
     [SerializeField]
     private GameObject objectToPlacePrefab;
+    [SerializeField]
+    private Camera arCamera; // Assignez votre "AR Camera" ici
+
+    [Header("Spawn Settings")]
+    [SerializeField]
+    private bool m_OnlySpawnInView = true;
+    [SerializeField, Range(0f, 0.5f)]
+    private float m_ViewportPeriphery = 0.1f; // Marge de sécurité sur les bords (10%)
+    [SerializeField]
+    private bool m_SpawnAsChildren = false;
 
     // Liste pour stocker les résultats du raycast
     private List<ARRaycastHit> hits = new List<ARRaycastHit>();
-    
-    // Référence à l'action de l'Input System pour le toucher
-    private InputAction touchPositionAction;
-    private InputAction touchPressAction; 
 
-    // Variable pour suivre la position du toucher
-    private Vector2 touchPosition; 
+    // Input System
+    private InputAction touchPositionAction;
+    private InputAction touchPressAction;
+    private Vector2 touchPosition;
+
+    private void Awake()
+    {
+        // Si la caméra n'est pas assignée manuellement, on cherche la caméra principale
+        if (arCamera == null) arCamera = Camera.main;
+    }
 
     private void OnEnable()
     {
-        // Active le support des touchers avancés
-        EnhancedTouchSupport.Enable(); 
-        
-        // Configuration des inputs
+        EnhancedTouchSupport.Enable();
+
         touchPressAction = new InputAction("TouchPress", binding: "<Touchscreen>/primaryTouch/press");
         touchPositionAction = new InputAction("TouchPosition", binding: "<Touchscreen>/primaryTouch/position");
 
         touchPressAction.Enable();
         touchPositionAction.Enable();
 
-        // Abonnements aux événements
         touchPressAction.performed += OnTouchPressed;
         touchPositionAction.performed += ctx => touchPosition = ctx.ReadValue<Vector2>();
     }
 
     private void OnDisable()
     {
-        // Désabonnement et nettoyage
         touchPressAction.performed -= OnTouchPressed;
         touchPressAction.Disable();
         touchPositionAction.Disable();
-        
+
         EnhancedTouchSupport.Disable();
     }
 
     private void OnTouchPressed(InputAction.CallbackContext context)
     {
-        // Raycast depuis la position du toucher vers les plans détectés
+        // 1. Protection UI : Si on touche un bouton, on ne fait rien
+        if (EventSystem.current.IsPointerOverGameObject(context.control.device.deviceId))
+        {
+            return; 
+        }
+        // Raycast depuis la position du toucher
         if (arRaycastManager.Raycast(touchPosition, hits, UnityEngine.XR.ARSubsystems.TrackableType.PlaneWithinPolygon))
         {
-            // Récupère la pose (position + rotation) du plan touché
             var hitPose = hits[0].pose;
+            
+            // Dans ARFoundation, hitPose.up correspond à la normale du plan
+            Vector3 spawnNormal = hitPose.up;
+            Vector3 spawnPoint = hitPose.position;
 
-            // --- CORRECTION ---
-            // Le Quad d'Unity est vertical par défaut. 
-            // hitPose.rotation aligne l'objet avec la normale du plan (vers le haut).
-            // On ajoute une rotation de 90 degrés sur l'axe X pour le coucher à plat.
-            Quaternion rotationFinale = hitPose.rotation * Quaternion.Euler(90, 0, 0);
-
-            // Instancier le prefab avec la nouvelle rotation calculée
-            Instantiate(objectToPlacePrefab, hitPose.position, rotationFinale);
+            // Appel de la logique personnalisée
+            TrySpawnObject(spawnPoint, spawnNormal);
         }
+    }
+
+    // VOTRE LOGIQUE IMPLÉMENTÉE ICI
+    public bool TrySpawnObject(Vector3 spawnPoint, Vector3 spawnNormal)
+    {
+        // 1. Vérification si le point est dans le champ de vision (Viewport)
+        if (m_OnlySpawnInView)
+        {
+            var inViewMin = m_ViewportPeriphery;
+            var inViewMax = 1f - m_ViewportPeriphery;
+            
+            // Conversion World -> Viewport
+            var pointInViewportSpace = arCamera.WorldToViewportPoint(spawnPoint);
+
+            // Vérification des limites (z < 0 signifie derrière la caméra)
+            if (pointInViewportSpace.z < 0f || 
+                pointInViewportSpace.x > inViewMax || pointInViewportSpace.x < inViewMin ||
+                pointInViewportSpace.y > inViewMax || pointInViewportSpace.y < inViewMin)
+            {
+                return false; // Hors du champ de vision défini
+            }
+        }
+
+        // 2. Instanciation
+        var newObject = Instantiate(objectToPlacePrefab);
+
+        if (m_SpawnAsChildren)
+            newObject.transform.parent = transform;
+
+        // 3. Positionnement avec léger décalage (offset) pour éviter le Z-Fighting
+        newObject.transform.position = spawnPoint + spawnNormal * 0.02f;
+
+        // 4. Rotation 
+        // Note : Cette logique oriente l'axe Z de l'objet VERS la surface (opposé à la normale)
+        // et tente de garder l'axe Y vers le haut du monde (Vector3.up).
+        newObject.transform.rotation = Quaternion.LookRotation(spawnNormal * -1, Vector3.up);
+
+        return true;
     }
 }
