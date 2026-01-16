@@ -18,15 +18,16 @@ public class ARPainter : MonoBehaviour
     public float lineOffset = 0.01f;
     public TrackableType trackableTypes = TrackableType.PlaneWithinPolygon;
 
-    // --- NOUVEAU : Couleur par défaut ---
     private Color currentColor = Color.black; 
 
     ARRaycastManager raycastManager;
     GameObject currentLine;
     LineRenderer currentLineRenderer;
     List<Vector3> currentPoints = new List<Vector3>();
-
     static List<ARRaycastHit> s_Hits = new List<ARRaycastHit>();
+
+    // --- NOUVEAU : Historique des lignes ---
+    private List<GameObject> linesHistory = new List<GameObject>();
 
     void Awake()
     {
@@ -91,15 +92,13 @@ public class ARPainter : MonoBehaviour
             return;
         }
 
-        // --- NOUVEAU : Application de la couleur ---
-        // On change la couleur de début et de fin du trait
         currentLineRenderer.startColor = currentColor;
         currentLineRenderer.endColor = currentColor;
-
-        // Astuce : Pour que la couleur marche, le matériau du LineRenderer doit être compatible.
-        // On force souvent le material color aussi par sécurité.
         currentLineRenderer.material.color = currentColor; 
-        // -------------------------------------------
+
+        // --- NOUVEAU : On ajoute la ligne à l'historique ---
+        linesHistory.Add(currentLine);
+        // --------------------------------------------------
 
         currentPoints.Clear();
         AddPoint(startPos);
@@ -119,10 +118,34 @@ public class ARPainter : MonoBehaviour
         currentPoints.Clear();
     }
 
+    // --- FONCTION 1 : TOUT EFFACER (Sécurisée) ---
     public void ClearAllLines()
     {
-        foreach (var lr in FindObjectsOfType<LineRenderer>()) Destroy(lr.gameObject);
+        // On détruit tout ce qui est dans notre liste
+        foreach (GameObject line in linesHistory)
+        {
+            if (line != null) Destroy(line);
+        }
+        linesHistory.Clear(); // On vide la liste
     }
+
+    // --- FONCTION 2 : UNDO (Annuler le dernier trait) ---
+    public void UndoLastLine()
+    {
+        if (linesHistory.Count > 0)
+        {
+            // 1. Récupérer le dernier objet de la liste
+            int lastIndex = linesHistory.Count - 1;
+            GameObject lastLine = linesHistory[lastIndex];
+
+            // 2. Le détruire de la scène
+            if (lastLine != null) Destroy(lastLine);
+
+            // 3. Le retirer de la liste
+            linesHistory.RemoveAt(lastIndex);
+        }
+    }
+    // ----------------------------------------------------
 
     private bool IsPointerOverUI(UnityEngine.InputSystem.Controls.TouchControl touch)
     {
@@ -130,13 +153,11 @@ public class ARPainter : MonoBehaviour
         return UnityEngine.EventSystems.EventSystem.current.IsPointerOverGameObject(touchId);
     }
 
-    // --- NOUVELLE FONCTION PUBLIQUE POUR LES BOUTONS ---
     public void SetBrushColor(Color newColor)
     {
         currentColor = newColor;
     }
     
-    // Surcharge pratique si vous voulez utiliser des boutons Unity standard avec des presets string (ex: "red")
     public void SetBrushColorByName(string colorName)
     {
         if(ColorUtility.TryParseHtmlString(colorName, out Color c))
